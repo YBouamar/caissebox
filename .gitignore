@@ -16,3 +16,4 @@ infra/backups/*
 apps/tablet/modules/*/android/build/
 apps/tablet/modules/*/android/.gradle/
 .expo/
+.sandbox-ca/

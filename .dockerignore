@@ -1,0 +1,9 @@
+**/node_modules
+**/.next
+**/dist
+**/.expo
+apps/tablet
+.git
+infra/backups
+*.log
+
