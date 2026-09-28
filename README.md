@@ -16,7 +16,7 @@ Caisse cloud pour cafés et restaurants au Maroc, proposée en location (matéri
 | `apps/backoffice` | Back-office des clients et console BACYBRAINS en Next.js | fait, testé de bout en bout |
 | `infra` | Docker Compose pour le VPS (PostgreSQL, API, back-office, Caddy, sauvegardes) | fait |
 | `scripts/seed-demo.mjs` | Client de démonstration avec 7 journées de ventes, créé par l'API | fait |
-| `apps/tablet` | Application tablette React Native (Expo) | à venir |
+| `apps/tablet` | Application tablette Android (Expo) : caisse hors ligne, base chiffrée, synchronisation, impression Bluetooth et Wi-Fi | fait, testé contre l'API |
 
 ## Démarrer en local
 
@@ -74,3 +74,4 @@ Caddy obtient les certificats HTTPS automatiquement pour l'API, le back-office e
 - [Architecture](docs/architecture.md)
 - [Protocole de synchronisation](docs/sync-protocol.md)
 - [API](docs/api.md)
+- [Application tablette](docs/tablet.md)

@@ -1,0 +1,7 @@
+{
+  "name": "caissebox-printer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Impression ESC/POS brute en Wi-Fi (TCP 9100) et Bluetooth (SPP) pour CaisseBox.",
+  "main": "index.ts"
+}

@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import {
   Change,
+  FetchResponse,
+  SnapshotResponse,
   MAX_CHANGES_PER_PULL,
   OpResult,
   PullResponse,
@@ -45,10 +47,6 @@ const DAY_TABLES: Record<string, string> = {
   kitchen_tickets: 'SELECT t.* FROM kitchen_tickets t JOIN orders o ON o.id = t.order_id JOIN business_days d ON d.id = o.business_day_id WHERE d.establishment_id = $1 AND d.status = \'open\'',
 };
 
-export interface SnapshotResponse {
-  cursor: number;
-  tables: Record<string, Row[]>;
-}
 
 @Injectable()
 export class SyncService {
@@ -92,7 +90,9 @@ export class SyncService {
           continue;
         }
         if (op.deviceSeq <= last) {
-          results.push({ ...base, status: 'rejected', code: 'CONFLICT', message: 'Numéro de séquence déjà consommé' });
+          // Compteur local en retard (réinstallation) : rien n'est consommé, la tablette renumérote.
+          gap = true;
+          results.push({ ...base, status: 'rejected', code: 'SEQUENCE_STALE', message: `Séquence déjà utilisée, reprendre à ${last + 1}` });
           continue;
         }
         if (gap || op.deviceSeq !== last + 1) {
@@ -233,7 +233,7 @@ export class SyncService {
             table === 'establishments'
               ? 'SELECT * FROM establishments WHERE id = $1'
               : scoped
-                ? `SELECT * FROM ${table} WHERE establishment_id = $1`
+                ? `SELECT * FROM ${table} WHERE establishment_id = $1 OR establishment_id IS NULL`
                 : `SELECT * FROM ${table}`;
           const { rows } = await c.query<Row>(sql, scoped || table === 'establishments' ? [scope.establishmentId] : []);
           tables[table] = rows;
@@ -243,11 +243,44 @@ export class SyncService {
           tables[table] = rows;
         }
         await recordPulled(c, scope, cursor);
-        return { cursor, tables };
+        const state = await c.query<{ last_device_seq: string }>('SELECT last_device_seq FROM device_sync_state WHERE device_id = $1', [scope.deviceId]);
+        const lastOrder = await c.query<{ number: string }>(
+          'SELECT number FROM orders WHERE device_id = $1 ORDER BY opened_at DESC, number DESC LIMIT 1',
+          [scope.deviceId],
+        );
+        const z = await c.query<{ z: number | null }>('SELECT max(z_number) AS z FROM business_days WHERE establishment_id = $1', [scope.establishmentId]);
+        return {
+          cursor,
+          tables,
+          device: {
+            lastDeviceSeq: Number(state.rows[0]?.last_device_seq ?? 0),
+            lastOrderNumber: lastOrder.rows[0]?.number ?? null,
+            lastZNumber: Number(z.rows[0]?.z ?? 0),
+          },
+        };
       },
       { repeatableRead: true },
     );
   }
+}
+
+/**
+ * Relecture de lignes précises, après un rejet : la tablette remplace sa version
+ * locale par celle du serveur (ou la supprime si la ligne n'existe pas).
+ */
+export async function fetchRows(db: DbService, scope: DeviceScope, items: { entity: WritableEntity; id: string }[]): Promise<FetchResponse> {
+  return db.withTenant({ tenantId: scope.tenantId, deviceId: scope.deviceId }, async (c) => {
+    const rows: FetchResponse['rows'] = [];
+    for (const { entity, id } of items) {
+      const scoped = WRITE_RULES[entity].scopedToEstablishment;
+      const { rows: found } = await c.query<Row>(
+        `SELECT * FROM ${entity} WHERE id = $1${scoped ? ' AND establishment_id = $2' : ''}`,
+        scoped ? [id, scope.establishmentId] : [id],
+      );
+      rows.push({ entity, id, data: found[0] ?? null });
+    }
+    return { rows };
+  });
 }
 
 async function recordPulled(c: PoolClient, scope: DeviceScope, cursor: number): Promise<void> {

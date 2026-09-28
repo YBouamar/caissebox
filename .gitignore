@@ -8,8 +8,11 @@ coverage/
 .DS_Store
 .expo/
 .next/
-android/
-ios/
+apps/tablet/android/
+apps/tablet/ios/
 infra/backups/*
 !infra/backups/.gitkeep
 *.tsbuildinfo
+apps/tablet/modules/*/android/build/
+apps/tablet/modules/*/android/.gradle/
+.expo/

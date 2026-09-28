@@ -34,7 +34,7 @@ export class AuthService {
     deviceId: string,
     secret: string,
     appVersion?: string,
-  ): Promise<{ token: string; tenantId: string; establishmentId: string; accessState: string }> {
+  ): Promise<{ token: string; tenantId: string; establishmentId: string; accessState: string; label: string | null; establishmentName: string }> {
     const device = await this.db.asPlatform(async (c) => {
       const { rows } = await c.query<{
         id: string;
@@ -43,8 +43,10 @@ export class AuthService {
         secret_hash: string | null;
         access_state: string;
         tenant_status: string;
+        label: string | null;
+        establishment_name: string;
       }>(
-        `SELECT d.id, d.tenant_id, d.establishment_id, d.secret_hash, e.access_state, t.status AS tenant_status
+        `SELECT d.id, d.tenant_id, d.establishment_id, d.secret_hash, e.access_state, t.status AS tenant_status, d.label, e.name AS establishment_name
            FROM devices d
            JOIN establishments e ON e.id = d.establishment_id
            JOIN tenants t ON t.id = d.tenant_id
@@ -69,6 +71,13 @@ export class AuthService {
       tenantId: device.tenant_id,
       establishmentId: device.establishment_id,
     });
-    return { token, tenantId: device.tenant_id, establishmentId: device.establishment_id, accessState: device.access_state };
+    return {
+      token,
+      tenantId: device.tenant_id,
+      establishmentId: device.establishment_id,
+      accessState: device.access_state,
+      label: device.label,
+      establishmentName: device.establishment_name,
+    };
   }
 }

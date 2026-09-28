@@ -1,0 +1,6 @@
+{
+  "platforms": ["android"],
+  "android": {
+    "modules": ["ma.caissebox.printer.CaisseBoxPrinterModule"]
+  }
+}

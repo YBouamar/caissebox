@@ -168,6 +168,27 @@ export interface Change {
   data: Record<string, unknown> | null;
 }
 
+export interface SnapshotResponse {
+  cursor: number;
+  tables: Record<string, Record<string, unknown>[]>;
+  device: {
+    /** Dernier device_seq acquitté : la numérotation locale reprend à +1. */
+    lastDeviceSeq: number;
+    /** Dernier numéro de ticket créé par cette tablette (ex. « C1-0147 »). */
+    lastOrderNumber: string | null;
+    /** Dernier numéro de Z de l'établissement. */
+    lastZNumber: number;
+  };
+}
+
+export const fetchRequestSchema = z.object({
+  items: z.array(z.object({ entity: z.enum(WRITABLE_ENTITIES), id: z.string().uuid() })).min(1).max(200),
+});
+
+export interface FetchResponse {
+  rows: { entity: string; id: string; data: Record<string, unknown> | null }[];
+}
+
 export interface PullResponse {
   changes: Change[];
   nextCursor: number;
@@ -177,6 +198,7 @@ export interface PullResponse {
 /** Codes de rejet stables, affichés et journalisés côté tablette. */
 export const SYNC_ERRORS = {
   SEQUENCE_GAP: 'Opération hors séquence : renvoyer depuis la dernière acquittée',
+  SEQUENCE_STALE: 'Numéro de séquence déjà utilisé : renuméroter à partir de lastDeviceSeq + 1',
   UNKNOWN_ENTITY: 'Entité non synchronisable',
   FORBIDDEN_COLUMN: 'Colonne non modifiable depuis une tablette',
   NOT_FOUND: 'Ligne introuvable pour une modification',

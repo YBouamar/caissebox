@@ -34,7 +34,13 @@ Réponse :
 { "results": [{ "opId": "…", "deviceSeq": 42, "status": "applied" }], "lastDeviceSeq": 42 }
 ```
 
-Codes de rejet : `SEQUENCE_GAP`, `UNKNOWN_ENTITY`, `FORBIDDEN_COLUMN`, `NOT_FOUND`, `CONFLICT`, `BUSINESS_RULE`, `INVALID`.
+Codes de rejet : `SEQUENCE_GAP`, `SEQUENCE_STALE`, `UNKNOWN_ENTITY`, `FORBIDDEN_COLUMN`, `NOT_FOUND`, `CONFLICT`, `BUSINESS_RULE`, `INVALID`.
+
+`SEQUENCE_STALE` : le numéro de séquence a déjà servi (tablette réinstallée). Rien n'est consommé ; la tablette renumérote à partir de `lastDeviceSeq + 1` et renvoie.
+
+## Relecture : `POST /sync/fetch`
+
+`{ items: [{ entity, id }] }` renvoie la version serveur de chaque ligne (ou `null` si elle n'existe pas). La tablette s'en sert après un rejet pour remplacer sa version locale.
 
 ## Descente : `GET /sync/pull?cursor=N&limit=1000`
 
@@ -46,7 +52,7 @@ La tablette applique les changements dans l'ordre (upsert par `id`), puis rappel
 
 ## Instantané : `GET /sync/snapshot`
 
-Pour une tablette neuve ou réinitialisée : données de référence complètes et données des journées encore ouvertes, lues dans une transaction `REPEATABLE READ`, avec le curseur correspondant. La tablette enchaîne ensuite par des `pull` depuis ce curseur.
+Pour une tablette neuve ou réinitialisée : données de référence complètes et données des journées encore ouvertes, lues dans une transaction `REPEATABLE READ`, avec le curseur correspondant. La réponse contient aussi `device` : dernier `device_seq` acquitté, dernier numéro de ticket de la tablette et dernier numéro de Z de l'établissement. La tablette enchaîne ensuite par des `pull` depuis ce curseur.
 
 ## Cycle conseillé côté tablette
 

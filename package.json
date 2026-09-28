@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "pnpm -r --filter ./packages/* --filter ./apps/api --filter ./apps/backoffice run build",
-    "test": "pnpm -r --filter ./packages/* --filter ./apps/api run test",
+    "test": "pnpm -r --filter ./packages/* --filter ./apps/api --filter ./apps/tablet run test",
     "typecheck": "pnpm -r run typecheck",
     "db:migrate": "pnpm --filter @caissebox/api run db:migrate"
   }

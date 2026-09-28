@@ -1,10 +1,11 @@
 import { Body, Controller, ForbiddenException, Get, HttpCode, Post, Query, UseGuards } from '@nestjs/common';
-import { MAX_CHANGES_PER_PULL, pushRequestSchema } from '@caissebox/shared';
+import { fetchRequestSchema, MAX_CHANGES_PER_PULL, pushRequestSchema } from '@caissebox/shared';
+import { DbService } from '../db/db.service';
 import { z } from 'zod';
 import { AllowOnly, AuthGuard, CurrentPrincipal } from '../auth/auth.guard';
 import { Principal } from '../auth/tokens.service';
 import { parseBody } from '../common/validation';
-import { DeviceScope, SyncService } from './sync.service';
+import { DeviceScope, fetchRows, SyncService } from './sync.service';
 
 const pullQuery = z.object({
   cursor: z.coerce.number().int().min(0).default(0),
@@ -20,7 +21,10 @@ function scopeOf(p: Principal): DeviceScope {
 @UseGuards(AuthGuard)
 @AllowOnly('device')
 export class SyncController {
-  constructor(private readonly sync: SyncService) {}
+  constructor(
+    private readonly sync: SyncService,
+    private readonly db: DbService,
+  ) {}
 
   @Post('push')
   @HttpCode(200)
@@ -33,6 +37,12 @@ export class SyncController {
   pull(@CurrentPrincipal() p: Principal, @Query() query: unknown) {
     const { cursor, limit } = parseBody(pullQuery, query);
     return this.sync.pull(scopeOf(p), cursor, limit);
+  }
+
+  @Post('fetch')
+  @HttpCode(200)
+  fetch(@CurrentPrincipal() p: Principal, @Body() body: unknown) {
+    return fetchRows(this.db, scopeOf(p), parseBody(fetchRequestSchema, body).items);
   }
 
   @Get('snapshot')

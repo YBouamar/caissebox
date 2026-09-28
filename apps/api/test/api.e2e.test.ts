@@ -353,6 +353,26 @@ describe('synchronisation : service complet', () => {
     expect(res.body.tables.payment_methods).toHaveLength(4);
     expect(res.body.tables.business_days).toHaveLength(0); // journée clôturée
     expect(res.body.tables.establishments).toHaveLength(1);
+    expect(res.body.device).toMatchObject({ lastOrderNumber: 'C1-0001', lastZNumber: 1 });
+    expect(res.body.device.lastDeviceSeq).toBe(seqs.get(A.deviceId));
+  });
+
+  test('séquence périmée (réinstallation) : rien n’est consommé', async () => {
+    const stale = { ...op(A, 'customers', 'insert', randomUUID(), { full_name: 'Test' }), deviceSeq: 1 };
+    seqs.set(A.deviceId, (seqs.get(A.deviceId) ?? 0) - 1);
+    const res = await push(A, [stale]);
+    expect(res.results[0]).toMatchObject({ status: 'rejected', code: 'SEQUENCE_STALE' });
+    expect(res.lastDeviceSeq).toBe(seqs.get(A.deviceId));
+  });
+
+  test('relecture de lignes précises', async () => {
+    const res = await http
+      .post('/sync/fetch')
+      .set(auth(A.deviceToken))
+      .send({ items: [{ entity: 'orders', id: ids.order }, { entity: 'orders', id: randomUUID() }] });
+    expect(res.status).toBe(200);
+    expect(res.body.rows[0].data.status).toBe('paid');
+    expect(res.body.rows[1].data).toBeNull();
   });
 });
 
