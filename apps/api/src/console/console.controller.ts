@@ -1,4 +1,5 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, UseFilters, UseGuards } from '@nestjs/common';
+import { PgExceptionFilter } from '../common/pg-exception.filter';
 import { z } from 'zod';
 import { AllowOnly, AuthGuard } from '../auth/auth.guard';
 import { parseBody } from '../common/validation';
@@ -25,6 +26,7 @@ const accessSchema = z.object({ state: z.enum(['normal', 'warning_manager', 'war
 
 @Controller('console')
 @UseGuards(AuthGuard)
+@UseFilters(PgExceptionFilter)
 @AllowOnly('operator')
 export class ConsoleController {
   constructor(private readonly console: ConsoleService) {}
@@ -32,6 +34,16 @@ export class ConsoleController {
   @Get('tenants')
   tenants() {
     return this.console.listTenants();
+  }
+
+  @Get('tenants/:id')
+  tenant(@Param('id', ParseUUIDPipe) id: string) {
+    return this.console.tenant(id);
+  }
+
+  @Get('devices')
+  devices(@Query('status') status?: string) {
+    return this.console.devices(parseBody(z.enum(['stock', 'deployed', 'repair', 'lost', 'retired']).optional(), status));
   }
 
   @Post('tenants')

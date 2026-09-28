@@ -34,19 +34,21 @@ services:
       PORT: 3000
       CORS_ORIGIN: https://${BACKOFFICE_DOMAIN},https://${CONSOLE_DOMAIN}
 
-  # Le back-office Next.js arrive à l'étape suivante ; le service est prêt à être activé.
-  # backoffice:
-  #   build:
-  #     context: ..
-  #     dockerfile: apps/backoffice/Dockerfile
-  #   restart: unless-stopped
-  #   environment:
-  #     API_URL: http://api:3000
+  # Back-office des clients et console BACYBRAINS (même application, aiguillage par compte).
+  # Il appelle l'API par le réseau Docker interne : aucun appel du navigateur vers l'API.
+  backoffice:
+    build:
+      context: ..
+      dockerfile: apps/backoffice/Dockerfile
+    restart: unless-stopped
+    depends_on: [api]
+    environment:
+      API_URL: http://api:3000
 
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
-    depends_on: [api]
+    depends_on: [api, backoffice]
     ports:
       - "80:80"
       - "443:443"

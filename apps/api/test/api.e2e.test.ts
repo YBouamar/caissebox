@@ -386,3 +386,111 @@ describe('isolation entre clients', () => {
     expect(res.results[0]).toMatchObject({ status: 'rejected', code: 'BUSINESS_RULE' });
   });
 });
+
+describe('back-office', () => {
+  test('catalogue : famille, article, référence d’un autre client refusée', async () => {
+    const fam = await http.post('/bo/r/families').set(auth(A.ownerToken)).send({ name: 'Jus frais', color: '#F5A524' });
+    expect(fam.status).toBe(201);
+    const item = await http.post('/bo/r/items').set(auth(A.ownerToken)).send({ family_id: fam.body.id, name: 'Jus d’orange', price_cents: 1800 });
+    expect(item.status).toBe(201);
+    expect(item.body.tenant_id).toBe(A.tenantId);
+
+    const bFamily = (await pool.query('SELECT id FROM families WHERE tenant_id = $1 LIMIT 1', [B.tenantId])).rows[0];
+    const cross = await http.post('/bo/r/items').set(auth(A.ownerToken)).send({ family_id: bFamily.id, name: 'X', price_cents: 1 });
+    expect(cross.status).toBe(400);
+
+    const list = await http.get(`/bo/r/items?family_id=${fam.body.id}`).set(auth(A.ownerToken));
+    expect(list.body).toHaveLength(1);
+    const bList = await http.get('/bo/r/items').set(auth(B.ownerToken));
+    expect(bList.body.some((i: { id: string }) => i.id === item.body.id)).toBe(false);
+
+    const upd = await http.patch(`/bo/r/items/${item.body.id}`).set(auth(A.ownerToken)).send({ price_cents: 2000, tenant_id: B.tenantId });
+    expect(upd.status).toBe(200);
+    expect(upd.body.price_cents).toBe('2000');
+    expect(upd.body.tenant_id).toBe(A.tenantId); // colonne inconnue ignorée par le schéma
+
+    expect((await http.delete(`/bo/r/items/${item.body.id}`).set(auth(A.ownerToken))).status).toBe(400);
+  });
+
+  test('un seul taux de TVA par défaut', async () => {
+    const t = await http.post('/bo/r/tax-rates').set(auth(A.ownerToken)).send({ label: 'TVA 7 %', rate_bp: 700, is_default: true });
+    expect(t.status).toBe(201);
+    const rates = (await http.get('/bo/r/tax-rates').set(auth(A.ownerToken))).body as { is_default: boolean }[];
+    expect(rates.filter((r) => r.is_default)).toHaveLength(1);
+  });
+
+  test('menu composé : étape et choix, suppression d’une étape', async () => {
+    const fam = (await http.get('/bo/r/families').set(auth(A.ownerToken))).body[0];
+    const menu = await http.post('/bo/r/items').set(auth(A.ownerToken)).send({ family_id: fam.id, kind: 'menu', name: 'Formule petit-déj', price_cents: 3500 });
+    const step = await http.post('/bo/r/menu-steps').set(auth(A.ownerToken)).send({ menu_item_id: menu.body.id, name: 'Boisson' });
+    expect(step.status).toBe(201);
+    const choice = await http.post('/bo/r/menu-step-choices').set(auth(A.ownerToken)).send({ step_id: step.body.id, item_id: A.itemId });
+    expect(choice.status).toBe(201);
+    expect((await http.delete(`/bo/r/menu-steps/${step.body.id}`).set(auth(A.ownerToken))).status).toBe(200);
+  });
+
+  test('salle : table rattachée à une zone', async () => {
+    const zones = (await http.get(`/bo/r/zones?establishment_id=${A.establishmentId}`).set(auth(A.ownerToken))).body;
+    expect(zones).toHaveLength(1);
+    const t = await http.post('/bo/r/tables').set(auth(A.ownerToken)).send({ establishment_id: A.establishmentId, zone_id: zones[0].id, label: 'T1', seats: 4 });
+    expect(t.status).toBe(201);
+    const bZone = (await pool.query('SELECT id FROM zones WHERE tenant_id = $1', [B.tenantId])).rows[0];
+    const bad = await http.post('/bo/r/tables').set(auth(A.ownerToken)).send({ establishment_id: A.establishmentId, zone_id: bZone.id, label: 'T2' });
+    expect(bad.status).toBe(400);
+  });
+
+  test('personnel : changement de PIN, PIN déjà pris refusé, droits du rôle', async () => {
+    expect((await http.put(`/bo/staff/${A.waiterId}/pin`).set(auth(A.ownerToken)).send({ pin: '1234' })).status).toBe(409);
+    expect((await http.put(`/bo/staff/${A.waiterId}/pin`).set(auth(A.ownerToken)).send({ pin: '4321' })).status).toBe(200);
+    const roles = (await http.get('/bo/roles').set(auth(A.ownerToken))).body as { id: string; name: string }[];
+    const serveur = roles.find((r) => r.name === 'Serveur')!;
+    const upd = await http.patch(`/bo/roles/${serveur.id}`).set(auth(A.ownerToken)).send({ permissions: { 'line.comp': true } });
+    expect(upd.status).toBe(200);
+    expect(upd.body.permissions['line.comp']).toBe(true);
+    const bad = await http.patch(`/bo/roles/${serveur.id}`).set(auth(A.ownerToken)).send({ permissions: { 'drop.tables': true } });
+    expect(bad.status).toBe(400);
+  });
+
+  test('rapport de journée : recettes, TVA, modes de paiement, serveurs', async () => {
+    const days = (await http.get(`/bo/reports/days?establishmentId=${A.establishmentId}`).set(auth(A.ownerToken))).body;
+    expect(days).toHaveLength(1);
+    const r = (await http.get(`/bo/reports/days/${days[0].id}`).set(auth(A.ownerToken))).body;
+    expect(r.day.zNumber).toBe(1);
+    expect(r.totals).toMatchObject({ ttcCents: 5000, htCents: 4545, tvaCents: 455, voidedCents: 1250 });
+    expect(r.taxes).toEqual([{ rateBp: 1000, htCents: 4545, tvaCents: 455, ttcCents: 5000 }]);
+    expect(r.payments.map((p: { kind: string; amountCents: number }) => [p.kind, p.amountCents])).toEqual([
+      ['cash', 3000],
+      ['customer_credit', 2000],
+    ]);
+    expect(r.waiters).toEqual([{ staffId: A.waiterId, name: 'Sara Alaoui', orders: 1, amountCents: 5000, cashCents: 3000 }]);
+    expect(r.topItems[0]).toEqual({ name: 'Café noir', quantity: 4, amountCents: 5000 });
+    // Un autre client ne voit pas ce rapport.
+    expect((await http.get(`/bo/reports/days/${days[0].id}`).set(auth(B.ownerToken))).status).toBe(404);
+
+    const dash = (await http.get(`/bo/dashboard?establishmentId=${A.establishmentId}`).set(auth(A.ownerToken))).body;
+    expect(dash.current.totals.ttcCents).toBe(5000);
+    expect(dash.tablets).toHaveLength(1);
+  });
+
+  test('ardoises : solde, règlement au back-office, dépassement refusé', async () => {
+    const list = (await http.get('/bo/customers').set(auth(A.ownerToken))).body as { full_name: string; id: string; balance_cents: number }[];
+    const hassan = list.find((c) => c.full_name === 'Hassan Tazi')!;
+    expect(hassan.balance_cents).toBe(2000);
+    const methods = (await http.get('/bo/r/payment-methods').set(auth(A.ownerToken))).body as { id: string; kind: string }[];
+    const cash = methods.find((m) => m.kind === 'cash')!.id;
+    const credit = methods.find((m) => m.kind === 'customer_credit')!.id;
+    expect((await http.post(`/bo/customers/${hassan.id}/settlements`).set(auth(A.ownerToken)).send({ amountCents: 5000, paymentMethodId: cash })).status).toBe(400);
+    expect((await http.post(`/bo/customers/${hassan.id}/settlements`).set(auth(A.ownerToken)).send({ amountCents: 500, paymentMethodId: credit })).status).toBe(400);
+    expect((await http.post(`/bo/customers/${hassan.id}/settlements`).set(auth(A.ownerToken)).send({ amountCents: 1500, paymentMethodId: cash })).status).toBe(201);
+    const ledger = (await http.get(`/bo/customers/${hassan.id}/ledger`).set(auth(A.ownerToken))).body as { amount_cents: number }[];
+    expect(ledger.reduce((s, l) => s + l.amount_cents, 0)).toBe(500);
+    expect((await http.get(`/bo/customers/${hassan.id}/ledger`).set(auth(B.ownerToken))).body).toEqual([]);
+  });
+
+  test('console : détail client et parc', async () => {
+    const detail = await http.get(`/console/tenants/${A.tenantId}`).set(auth(operatorToken));
+    expect(detail.body.establishments).toHaveLength(1);
+    const parc = await http.get('/console/devices?status=deployed').set(auth(operatorToken));
+    expect(parc.body.length).toBeGreaterThanOrEqual(2);
+  });
+});

@@ -12,3 +12,4 @@ android/
 ios/
 infra/backups/*
 !infra/backups/.gitkeep
+*.tsbuildinfo

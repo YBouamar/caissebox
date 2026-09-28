@@ -5,6 +5,8 @@ import { AuthService } from './auth/auth.service';
 import { TokensService } from './auth/tokens.service';
 import { BackofficeController } from './backoffice/backoffice.controller';
 import { BackofficeService } from './backoffice/backoffice.service';
+import { CrudService } from './backoffice/crud.service';
+import { ReportsService } from './backoffice/reports.service';
 import { APP_CONFIG, AppConfig, loadConfig } from './config';
 import { ConsoleController } from './console/console.controller';
 import { ConsoleService } from './console/console.service';
@@ -28,6 +30,8 @@ export class AppModule {
         SyncService,
         ConsoleService,
         BackofficeService,
+        CrudService,
+        ReportsService,
       ],
     };
   }

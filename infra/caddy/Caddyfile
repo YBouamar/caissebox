@@ -16,12 +16,15 @@
 	reverse_proxy api:3000
 }
 
-# Back-office client et console BACYBRAINS : à activer avec le service backoffice.
-# {$BACKOFFICE_DOMAIN} {
-# 	encode gzip
-# 	reverse_proxy backoffice:3000
-# }
-# {$CONSOLE_DOMAIN} {
-# 	encode gzip
-# 	reverse_proxy backoffice:3000
-# }
+# Back-office client et console BACYBRAINS : même application.
+{$BACKOFFICE_DOMAIN}, {$CONSOLE_DOMAIN} {
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+	reverse_proxy backoffice:3001
+}

@@ -99,6 +99,41 @@ export class ConsoleService {
     });
   }
 
+  async tenant(tenantId: string) {
+    return this.db.asPlatform(async (c) => {
+      const t = await c.query('SELECT * FROM tenants WHERE id = $1', [tenantId]);
+      if (!t.rows[0]) throw new NotFoundException('Client introuvable');
+      const establishments = await c.query(
+        'SELECT id, name, address, access_state, service_mode, created_at FROM establishments WHERE tenant_id = $1 ORDER BY name',
+        [tenantId],
+      );
+      const owners = await c.query("SELECT id, email, full_name, created_at FROM users WHERE tenant_id = $1 AND role = 'owner'", [tenantId]);
+      const devices = await c.query(
+        `SELECT id, kind, serial, model, label, status, establishment_id, app_version, last_seen_at
+           FROM devices WHERE tenant_id = $1 ORDER BY kind, label`,
+        [tenantId],
+      );
+      return { ...t.rows[0], establishments: establishments.rows, owners: owners.rows, devices: devices.rows };
+    });
+  }
+
+  async devices(status?: string) {
+    return this.db.asPlatform(async (c) => {
+      const { rows } = await c.query(
+        `SELECT d.id, d.kind, d.serial, d.model, d.label, d.status, d.app_version, d.last_seen_at,
+                d.purchase_price_cents, d.purchased_at, t.name AS tenant_name, e.name AS establishment_name,
+                d.tenant_id, d.establishment_id
+           FROM devices d
+           LEFT JOIN tenants t ON t.id = d.tenant_id
+           LEFT JOIN establishments e ON e.id = d.establishment_id
+          WHERE ($1::text IS NULL OR d.status = $1)
+          ORDER BY d.status, d.kind, d.serial`,
+        [status ?? null],
+      );
+      return rows;
+    });
+  }
+
   /** Entrée d'un matériel dans le parc (statut stock). */
   async registerDevice(input: { kind: 'tablet' | 'printer' | 'drawer'; serial: string; model?: string; purchasePriceCents?: number }) {
     return this.db.asPlatform(async (c) => {
