@@ -1,0 +1,27 @@
+{
+	email {$ACME_EMAIL}
+}
+
+# API : tablettes, back-office et console. Certificat Let's Encrypt automatique.
+{$API_DOMAIN} {
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		-Server
+	}
+	request_body {
+		max_size 6MB
+	}
+	reverse_proxy api:3000
+}
+
+# Back-office client et console BACYBRAINS : à activer avec le service backoffice.
+# {$BACKOFFICE_DOMAIN} {
+# 	encode gzip
+# 	reverse_proxy backoffice:3000
+# }
+# {$CONSOLE_DOMAIN} {
+# 	encode gzip
+# 	reverse_proxy backoffice:3000
+# }

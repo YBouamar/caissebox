@@ -1,0 +1,16 @@
+{
+  "name": "caissebox",
+  "private": true,
+  "version": "0.1.0",
+  "description": "CaisseBox : caisse cloud hors ligne pour cafés et restaurants (tablette Android, back-office web, console de location).",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter ./packages/* --filter ./apps/api run build",
+    "test": "pnpm -r --filter ./packages/* --filter ./apps/api run test",
+    "typecheck": "pnpm -r run typecheck",
+    "db:migrate": "pnpm --filter @caissebox/api run db:migrate"
+  }
+}
