@@ -58,6 +58,18 @@ TEST_PG_ADMIN_URL=postgres://postgres@localhost:5432/postgres \
 
 Les tests d'intégration recréent une base `caissebox_it` et déroulent un service complet : ouverture de journée, ticket, envoi en cuisine, annulation avec manager, paiement fractionné espèces et ardoise, décompte du stock, clôture de caisse, Z. Ils vérifient aussi l'idempotence, les trous de séquence, les colonnes interdites, l'isolation entre clients, le catalogue, les ardoises et les chiffres du rapport de journée (TVA, modes de paiement, serveurs).
 
+## Serveur de test local (Docker)
+
+```bash
+git clone https://github.com/YBouamar/caissebox.git && cd caissebox/infra
+docker compose -f docker-compose.local.yml up -d --build
+docker compose -f docker-compose.local.yml exec api node dist/db/create-operator.js ops@bacybrains.ma "Nom" "mot-de-passe-long"
+# Facultatif : café de démonstration
+docker run --rm -v "$(pwd)/..:/repo" --network host -e API_URL=http://localhost:3000 -e OPERATOR_PASSWORD="mot-de-passe-long" node:22-alpine node /repo/scripts/seed-demo.mjs
+```
+
+Console et back-office : `http://localhost:3001`. Sur la tablette (même Wi-Fi), adresse du serveur : `http://<IP du PC>:3000`.
+
 ## Mise en production (VPS Contabo)
 
 ```bash

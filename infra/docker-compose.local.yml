@@ -1,0 +1,49 @@
+# Serveur de test local (poste de développement ou PC du café pilote), sans HTTPS.
+# Lancement : docker compose -f docker-compose.local.yml up -d --build
+# API : http://<IP du PC>:3000   Back-office et console : http://<IP du PC>:3001
+name: caissebox-local
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: caissebox
+      POSTGRES_USER: caissebox
+      POSTGRES_PASSWORD: caissebox-local
+    volumes:
+      - pgdata-local:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U caissebox -d caissebox"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://caissebox:caissebox-local@postgres:5432/caissebox
+      JWT_SECRET: jeton-de-test-local-a-ne-pas-utiliser-en-production
+      PORT: 3000
+    ports:
+      - "3000:3000"
+
+  backoffice:
+    build:
+      context: ..
+      dockerfile: apps/backoffice/Dockerfile
+    restart: unless-stopped
+    depends_on: [api]
+    environment:
+      API_URL: http://api:3000
+    ports:
+      - "3001:3001"
+
+volumes:
+  pgdata-local:

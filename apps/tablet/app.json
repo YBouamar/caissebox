@@ -57,7 +57,8 @@
             "enableMinifyInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true,
             "extraProguardRules": "-keep class ma.caissebox.printer.** { *; }",
-            "useLegacyPackaging": true
+            "useLegacyPackaging": true,
+            "usesCleartextTraffic": true
           }
         }
       ]
