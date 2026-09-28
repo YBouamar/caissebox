@@ -56,7 +56,8 @@
           "android": {
             "enableMinifyInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true,
-            "extraProguardRules": "-keep class ma.caissebox.printer.** { *; }"
+            "extraProguardRules": "-keep class ma.caissebox.printer.** { *; }",
+            "useLegacyPackaging": true
           }
         }
       ]
