@@ -49,6 +49,16 @@
           "imageWidth": 160,
           "backgroundColor": "#0B1F3A"
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "-keep class ma.caissebox.printer.** { *; }"
+          }
+        }
       ]
     ],
     "experiments": {
